@@ -1,0 +1,385 @@
+---
+Title of code: "Coordinated Departures in Male Elephants"
+Author of code: "Jodie L. Berezin"
+Date last updated: "May 10th, 2024"
+---
+
+*About this code:*
+All analyses described in the manuscript are presented in the script below.
+Social network and dominance hierarchy code can be found at https://github.com/ptfreeman07/mushara-social-network
+
+Any questions about the data or code can be directed to the corresponding author:
+CEO-R, ceoconnell[at]stanford.edu
+
+Download relevant excel data files and convert the data sheet tab to a .csv for ease of analysis.
+
+*Table of Contents*
+1. Initial set up
+2. Analysis: Pre-departure vs Departure periods
+  a. Time
+  b. Number of rumbles
+3. Analysis: Individuality of rumbles
+4. Analysis: Associations
+
+
+# 1. Initial set up
+Loading data, libraries
+
+set up the working directory
+```{r}
+#setwd()
+```
+
+Load the libraries
+```{r}
+library(vegan) # for normalizing data, running permanovas, making dist matrix
+library(car) # for testing homogeneity of variance - levenes test
+library(coin) # for permutation test
+library(rstatix) # for wilcoxon effect size
+library(tidyverse)
+```
+
+
+# 2. Analysis: Pre-departure vs Departure periods
+
+This analysis will involve two main topics: time and number of rumbles for each period.
+
+Load the data
+```{r}
+#times <- read_csv("DataS2.csv")
+
+View(times)
+
+str(times)
+```
+
+
+## a. Time
+
+To evaluate whether the onset of the “let’s go” rumble bouts trigger departure, we used a paired Wilcoxon Signed Rank test to assess whether the pre-departure time was significantly longer than the post-departure time.
+
+### Data prep
+
+Change variable types
+```{r}
+times$Year <- as.factor(as.character(times$Year))
+times$Tape <- as.factor(as.character(times$Tape))
+```
+
+
+Add in the minutes column and remove unneeded variables
+```{r}
+times2 <- times %>%
+  mutate(BeforeLGR_mins = BeforeLGR_seconds/60,
+         DeparturePeriod_mins = DeparturePeriod_seconds/60) %>%
+  select(Year, Tape, BeforeLGR_mins, DeparturePeriod_mins)
+```
+
+
+Pivot longer for easier analysis (a column is made for Period)
+```{r}
+times3 <- pivot_longer(times2, cols = c(BeforeLGR_mins, DeparturePeriod_mins), names_to = "TimePeriod", values_to = "Time_mins")
+
+# rename
+times4 <- times3 %>%
+  mutate(TimePeriodNew = ifelse(TimePeriod == "BeforeLGR_mins", "Pre-departure","Departure"),
+         TimePeriod = as.factor(as.character(TimePeriodNew))) %>%
+  select(-TimePeriodNew)
+```
+
+
+### Summary stats
+
+```{r}
+timing.stats <- times4 %>%
+  group_by(TimePeriod) %>%
+  summarise(meanTime = mean(Time_mins),
+            sdTime = sd(Time_mins),
+            medianTime = median(Time_mins),
+            minTime = min(Time_mins),
+            maxTime = max(Time_mins))
+timing.stats
+```
+
+
+### Analysis
+
+We have to use the non-parametric Wilcoxon test because sample size less than 15 samples per group.
+
+Running the test [With all events]
+```{r}
+timing.stat <- wilcox.test(Time_mins ~ TimePeriod, data = times4, paired = T)
+timing.stat
+
+# not significantly different, p = 0.4688
+```
+
+Calculating the effect size
+```{r}
+wilcox_effsize(Time_mins ~ TimePeriod, data = times4, paired = T)
+
+# effect size = 0.319, magnitude = moderate
+```
+
+
+Testing without T137 because of the considerably longer departure than pre-departure time
+```{r}
+# remove T1373
+times4.T137removed <- times4 %>%
+  filter(!Tape == "T137")
+```
+
+Running the test
+```{r}
+timing.stat2 <- wilcox.test(Time_mins ~ TimePeriod, data = times4.T137removed, paired = T)
+timing.stat2
+
+# Still not significantly different, p = 0.3125
+```
+
+Calculating the effect size
+```{r}
+wilcox_effsize(Time_mins ~ TimePeriod, data = times4.T137removed, paired = T)
+
+# effect size = 0.471, magnitude = moderate
+```
+
+### Figure (Figure 3 in text)
+
+Paired box plot
+```{r}
+times4 %>%
+  ggplot(aes(x = factor(TimePeriod, level = level_order), y = Time_mins, fill = TimePeriod)) +
+  geom_boxplot(outlier.shape = 20, outlier.size = 2, show.legend = F, linewidth = 0.6) +
+  geom_point(show.legend = F, size = 2) +
+  geom_line(aes(group = Tape), linewidth = 0.7, linetype = 5) +
+  stat_summary(fun.y=mean, geom="point", shape=23, size=2, colour = "black", fill = "white", show.legend = F) +
+  scale_y_continuous(limits = c(0,60), breaks = c(0,10,20,30,40,50,60), expand = c(0,0)) +
+  ylab("Time (minutes)") +
+  xlab("Time Period") +
+  scale_fill_manual(values = c("forestgreen", "grey")) +
+  theme_bw(base_size = 14)
+```
+
+
+
+## b. Rate of rumbles
+
+A Wilcoxon Signed Rank test was also used to evaluate whether the number of rumbles significantly increased in the departure period (compared to the pre-departure period). Since longer events would be expected to have more rumbles, we calculated the rate of rumbles as the number of rumbles per minute in each period.
+
+
+### Data prep
+
+Calculate the rate of rumbles
+```{r}
+rumble.rates <- times2 %>%
+  group_by(Tape) %>%
+  summarise(PreRate = Rumbles_pre/BeforeLGR_mins,
+            DepartRate = Rumbles_depart/DeparturePeriod_mins)
+rumble.rates
+```
+
+Pivot longer for easier analysis (a column is made for Period)
+```{r}
+rumble.rates.long <- pivot_longer(rumble.rates, cols = c(PreRate, DepartRate), names_to = "TimePeriod", values_to = "RumbleRate")
+
+# adjust variable
+rumble.rates.long$TimePeriod <- as.factor(as.character(rumble.rates.long$TimePeriod))
+
+```
+
+
+### Summary stats
+
+```{r}
+rumblerates.stats <- rumble.rates.long %>%
+  group_by(TimePeriod) %>%
+  summarise(meanRate = mean(RumbleRate),
+            sdRate = sd(RumbleRate),
+            medianRate = median(RumbleRate),
+            minRate = min(RumbleRate),
+            maxRate = max(RumbleRate))
+rumblerates.stats
+```
+
+
+### Analysis
+
+We have to use non-parametric because sample size less than 15 samples per group
+
+Running the test
+```{r}
+rumbleRate.stat <- wilcox.test(RumbleRate ~ TimePeriod, data = rumble.rates.long, paired = T)
+rumbleRate.stat
+
+# significantly different, p = 0.0156
+```
+
+Testing the effect size
+```{r}
+wilcox_effsize(RumbleRate ~ TimePeriod, data = rumble.rates.long, paired = T)
+
+## effect size = 0.894, magnitude = large
+```
+
+
+# 3. Analysis: Individuality of rumbles
+
+*Note: only means per individual are provided rather than multiple rumbles per individual due to the data being part of an ongoing study.*
+
+We wanted to confirm that each “let’s go” rumble emitted contained a unique signature distinctive to  each known individual, reproducing the methodology of Wierucka et al. (2021). 
+
+## Data prep
+
+Load the data
+```{r}
+#rumbles <- read_csv("DataS1.csv")
+
+View(rumbles)
+
+str(rumbles)
+```
+
+
+Acoustic parameter data was normalized on a scale of 0 to 1 due to the different variable types, mean values of each variable, and disparate standard deviations.
+
+Transformation
+```{r}
+rumbles2 <- decostand(rumbles[,-1], method = "range")
+```
+
+
+Create new data frames: one for the euclidean distance matrix and one for the data part of the function
+```{r}
+# distance matrix
+rumbles.dist <- vegdist(rumbles2, method = "euclidean")
+
+# data
+rumbles3 <- cbind(rumbles[,1], rumbles2)
+```
+
+## Analysis
+
+Run Permutational Multivariate Analysis of Variance test (PERMANOVA)
+
+```{r}
+set.seed(111) # to ensure we get the same results every time
+
+perm <- adonis2(rumbles.dist ~ ElephantID, data = rumbles3, permutations = 999, method = "euclidean")
+perm
+```
+
+
+To confirm that differences were indeed due to the uniqueness of the calls between individuals, and not due to high within-individual variation, we tested for the homogeneity of variances using the betadisper function in the “vegan” package, followed by an ANOVA test.
+
+```{r}
+dispersion <- betadisper(rumbles.dist, group = rumbles3$ElephantID)
+
+permutest(dispersion) 
+# not significant so differences were not due to large within-individual variation; homogeneity of variances assumption was met
+
+anova(dispersion) # good!
+
+```
+
+
+
+# 4. Analysis: Associations
+
+*Associations data is not included due to being part of an ongoing study. Only the code used to analyze the data is provided below, along with some of the wrangling done.*
+
+We assessed whether the males involved in “let’s go” events had significantly higher dyadic associations than those not involved in the observed “let’s go” events.
+
+We used a Mann-Whitney U-test to assess for significant differences between the two groups of individuals, using the wilcox.test function in the “stats” package, with the alternative parameter set to “less.” 
+
+
+### Wrangling
+
+A vector was made that had the pairs of elephants that were observed in an LGR group. Next, we made a new, binary column that would have the value "yes" if the pair was in an LGR group and "no" if not.
+```{r}
+associations4 <- associations3 %>%
+  mutate(LGRgroup = ifelse(ElePair %in% group_pairs, "yes", "no"))
+
+associations4$LGRgroup <- as.factor(as.character(associations4$LGRgroup))
+
+```
+
+
+### Summary stats
+
+```{r}
+associations.stats <- associations4 %>%
+  group_by(LGRgroup) %>%
+  summarise(meanSRI = mean(weight),
+            medianSRI = median(weight),
+            SdSRI = sd(weight),
+            minSRI = min(weight),
+            maxSRI = max(weight),
+            sample = n())
+associations.stats
+```
+
+Image of the output:
+![Male Associations Summary Stats](C:/Users/jlber/OneDrive/Elephants/Males LGR/Stats/MalesLGR/associations_summary_stats.png) 
+
+### Analysis
+
+Our sample sizes are very uneven so we would need to test to see whether the variances are also uneven and what the distribution of our data is
+
+```{r}
+# distribution
+hist(associations4$weight) # very right skewed
+
+associations4_LGR0 <- associations4 %>%
+  filter(LGRgroup == "0")
+hist(associations4_LGR0$weight) # still right skewed
+
+associations4_LGR1 <- associations4 %>%
+  filter(LGRgroup == "1")
+hist(associations4_LGR1$weight, breaks = 10) # almost bimodal
+
+# test for normality
+shapiro.test(associations4_LGR0$weight) # significant - not normal
+shapiro.test(associations4_LGR1$weight) # significant - not normal
+
+# variance
+leveneTest(weight ~ LGRgroup, data = associations4) # very significant suggesting the variances are very different from each other
+```
+
+Mann-Whitney U-test (uses wilcox function)
+```{r}
+wilcox.test(weight ~ LGRgroup, data = associations4, paired = F) 
+
+# significant, p = 0.0001
+```
+
+Testing the effect size
+```{r}
+wilcox_effsize(weight ~ LGRgroup, data = associations4, paired = F) 
+
+# effect size = 0.26, magnitude = small
+```
+
+
+### Figure (Figure 4b in text)
+
+```{r}
+# to add the sample size
+samplesize = associations4 %>%
+  group_by(LGRgroup) %>%
+  summarise(SampleSize = n())
+
+# plot
+associations4 %>%
+  ggplot(aes(x=LGRgroup, y = weight, color = LGRgroup, fill = LGRgroup)) +
+  geom_violin(show.legend = F, width = 0.9, alpha = 0.5) +
+  geom_boxplot(show.legend = F, width = 0.09, alpha = 0.6, color = "black", fill = c("lightskyblue", "gold")) +
+  theme_bw(base_size = 14) +
+  xlab("Observed in LGR Event") +
+  ylab("Association Index (SRI)") +
+  stat_summary(fun.y=mean, geom="point", shape=23, size=2, colour = "black", fill = "black", show.legend = F) +
+  scale_color_manual(values = c("lightskyblue", "gold")) +
+  scale_fill_manual(values = c("lightskyblue", "gold")) +
+  scale_y_continuous(limits = c(0,1.00), breaks = c(0.00, 0.25,0.50,0.75,1.00), expand = c(0,0))
+```
+
