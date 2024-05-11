@@ -46,7 +46,7 @@ This analysis will involve two main topics: time and number of rumbles for each 
 
 Load the data
 ```{r}
-#times <- read_csv("DataS2.csv")
+#times <- read_csv("DataS1.csv")
 
 View(times)
 
@@ -233,7 +233,7 @@ We wanted to confirm that each “let’s go” rumble emitted contained a uniqu
 
 Load the data
 ```{r}
-#rumbles <- read_csv("DataS1.csv")
+#rumbles <- read_csv("DataS2.csv")
 
 View(rumbles)
 
