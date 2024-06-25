@@ -1,12 +1,18 @@
 ---
-Title of code: "Coordinated Departures in Male Elephants"
+Title of code: "Major Analyses for Male LGR"
 Author of code: "Jodie L. Berezin"
 Date last updated: "May 10th, 2024"
+
+Publication: "The use of vocal coordination in male African elephant group departures: evidence of active leadership and consensus"
+Authors: Caitlin E. O'Connell-Rodwell, Jodie L. Berezin, Alessio Pignatelli, Timothy C. Rodwell
+  
+* Any questions about the data or code can be directed to the corresponding author, CEO-R, ceoconnell[at]stanford.edu *
 ---
 
 *About this code:*
 All analyses described in the manuscript are presented in the script below.
-Social network and dominance hierarchy code can be found at https://github.com/ptfreeman07/mushara-social-network
+Social network and dominance hierarchy code can be found at https://github.com/Utopia-Sci-Lab/Male-Elephant-Character-Durability
+Note: the variable "tape" refers to the event number.
 
 Any questions about the data or code can be directed to the corresponding author:
 CEO-R, ceoconnell[at]stanford.edu
@@ -35,6 +41,7 @@ Load the libraries
 library(vegan) # for normalizing data, running permanovas, making dist matrix
 library(car) # for testing homogeneity of variance - levenes test
 library(coin) # for permutation test
+library(RVAideMemoire) # for post-hoc test of PERMANOVA results
 library(rstatix) # for wilcoxon effect size
 library(tidyverse)
 ```
@@ -56,7 +63,7 @@ str(times)
 
 ## a. Time
 
-To evaluate whether the onset of the “let’s go” rumble bouts trigger departure, we used a paired Wilcoxon Signed Rank test to assess whether the pre-departure time was significantly longer than the post-departure time.
+To evaluate whether the initial “let’s go” rumble triggered departure, we used a paired Wilcoxon Signed Rank test to assess for significant differences between the pre-departure and departure period.
 
 ### Data prep
 
@@ -227,7 +234,7 @@ wilcox_effsize(RumbleRate ~ TimePeriod, data = rumble.rates.long, paired = T)
 
 *Note: only means per individual are provided rather than multiple rumbles per individual due to the data being part of an ongoing study.*
 
-We wanted to confirm that each “let’s go” rumble emitted contained a unique signature distinctive to  each known individual, reproducing the methodology of Wierucka et al. (2021). 
+We wanted to assess whether each “let’s go” rumble emitted contained a unique signature distinctive to  each known individual, reproducing the methodology of Wierucka et al. (2021). 
 
 ## Data prep
 
@@ -270,15 +277,20 @@ perm
 ```
 
 
-To confirm that differences were indeed due to the uniqueness of the calls between individuals, and not due to high within-individual variation, we tested for the homogeneity of variances using the betadisper function in the “vegan” package, followed by an ANOVA test.
+To test the assumption of homogeneity of the variance-covariance matrix, we first used the betadisper function in the “vegan” package to calculate the average distance of an individual’s calls to their calculated centroid and then used an ANOVA test to assess whether the mean distances to centroid differed significantly among individuals. We then performed a pair-wise comparison of the mean distances among individuals using a Wilk’s test and false discovery rate method for p-value adjustment using the pairwise.perm.manova function in the “RVAideMemoire” package.
 
 ```{r}
 dispersion <- betadisper(rumbles.dist, group = rumbles3$ElephantID)
 
 permutest(dispersion) 
-# not significant so differences were not due to large within-individual variation; homogeneity of variances assumption was met
+# not significant so the homogeneity of variances assumption was met
 
 anova(dispersion) # good!
+
+
+# post-hoc test
+set.seed(15)
+post.hoc <- pairwise.perm.manova(rumbles.dist, fact = rumbles.perm3$ElephantID, test = "Wilks", p.method = "fdr")
 
 ```
 
