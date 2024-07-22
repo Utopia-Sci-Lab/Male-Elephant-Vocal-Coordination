@@ -8,7 +8,7 @@ The manuscript was posted as a pre-print to bioRxiv on June 1st, 2024: https://d
 The manuscript was published in _PeerJ_ on July 22nd, 2024: https://doi.org/10.7717/peerj.17767
 
 All code in this repository was written by Jodie L. Berezin and Alessio Pignatelli.
-Most recently updated: July 22nd, 2024.
+Most recently updated: June 25th, 2024.
 
 Summary of R code:
 1) "O'Connell-Rodwelletal_MalesLGR_AnalysisCode.Rmd" contains all major analyses reported in the manuscript, including: differences in the pre-departure and departure periods; changes in the rate of rumbles in each time period; PERMANOVA for rumble individuality; association indeces for individuals involved in LGR events (written by JLB)
