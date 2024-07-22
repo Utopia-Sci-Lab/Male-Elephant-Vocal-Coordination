@@ -2,7 +2,9 @@
 Code repository for Male Elephant Vocal Coordination
 
 These R scripts were used to run all statistical analyses reported in the manuscript, "The use of vocal coordination in male African elephant group departures: evidence of active leadership and consensus".
+
 The manuscript was posted as a pre-print to bioRxiv on June 1st, 2024: https://doi.org/10.1101/2024.05.31.596833
+
 The manuscript was published in _PeerJ_ on July 22nd, 2024: https://doi.org/10.7717/peerj.17767
 
 All code in this repository was written by Jodie L. Berezin and Alessio Pignatelli.
